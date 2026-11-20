@@ -1,4 +1,4 @@
-# PELICANSOFT WiFi drone controlling station
+# KOMPAS WiFi drone controlling station
 
 A comprehensive Python application for controlling RC drones via WiFi connection.
 
