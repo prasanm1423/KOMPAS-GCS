@@ -1,5 +1,7 @@
 # KOMPAS
 
+![KOMPAS flying in simulator mode with live camera HUD](docs/media/kompas-video-hud.gif)
+
 **An open-source ground control station for commodity WiFi RC drones.**
 
 KOMPAS connects to a low-cost WiFi drone over UDP and gives you a desktop
@@ -85,6 +87,9 @@ You can also enable it with `simulator.enabled: true` in the config or
 station on another machine: `python run_simulator.py --bind 0.0.0.0`.
 
 ## Pre-flight checklist
+
+![Pre-flight checklist, takeoff and landing](docs/media/kompas-preflight-takeoff.gif)
+![Low battery triggers automatic landing](docs/media/kompas-safety-autoland.gif)
 
 Takeoff stays locked until the aircraft passes a pre-flight checklist, shown
 live in the main window while it's on the ground:
