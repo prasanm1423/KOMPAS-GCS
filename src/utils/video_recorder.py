@@ -1,5 +1,5 @@
 """
-Video Recording Module for P8 Pro Drone Controller
+Video Recording Module for KOMPAS
 Handles video recording with telemetry overlay and metadata
 """
 

@@ -1,5 +1,5 @@
 """
-Communication package for P8 Pro drone
+Communication package for the drone
 Contains WiFi connection, video streaming, and protocol handling modules
 """
 

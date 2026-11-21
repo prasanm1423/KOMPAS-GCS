@@ -1,5 +1,5 @@
 """
-Drone Control Commands for P8 Pro
+Drone control commands for KOMPAS
 Implements flight control, movement, and configuration commands
 """
 
@@ -38,9 +38,16 @@ class DroneController:
         self.min_battery = 20  # percent
         
         # Current state
-        self.current_battery = 100
+        # Live state, fed by update_from_telemetry(). Battery starts unknown
+        # rather than at a made-up 100%, so takeoff can't pass the battery
+        # check before the drone has actually reported one.
+        self.current_battery: Optional[int] = None
         self.current_altitude = 0
-        self.current_speed = 0
+        self.current_speed = 0          # commanded speed setting (10-100)
+        self.ground_speed = 0.0         # measured, from telemetry
+        self.last_telemetry: Dict[str, Any] = {}
+        self.last_telemetry_time = 0.0
+        self._on_ground_since: Optional[float] = None
     
     def initialize(self) -> bool:
         """
@@ -80,6 +87,10 @@ class DroneController:
         """
         if self.is_flying:
             self.logger.warning("Already flying")
+            return False
+        
+        if self.current_battery is None:
+            self.logger.error("Battery level unknown - no telemetry received yet")
             return False
         
         if self.current_battery < self.min_battery:
@@ -394,6 +405,39 @@ class DroneController:
             self.logger.error(f"Battery check error: {e}")
             return None
     
+    def update_from_telemetry(self, parsed: Dict[str, Any]):
+        """
+        Update live state from a parsed telemetry packet.
+        
+        Also reconciles is_flying with what the drone reports: if the drone
+        sits on the ground for 2 s while we think it's flying (auto-land on
+        low battery, firmware watchdog, emergency cut-off), we mark it landed
+        so the UI and safety logic stop acting on a stale belief.
+        """
+        if not parsed:
+            return
+        now = time.time()
+        self.last_telemetry = parsed
+        self.last_telemetry_time = now
+        
+        if 'battery' in parsed:
+            self.current_battery = parsed['battery']
+        if 'altitude' in parsed:
+            self.current_altitude = parsed['altitude']
+        if 'speed_total' in parsed:
+            self.ground_speed = parsed['speed_total']
+        
+        altitude = parsed.get('altitude')
+        if altitude is not None and altitude <= 5 and self.current_mode != FlightMode.TAKEOFF:
+            if self._on_ground_since is None:
+                self._on_ground_since = now
+            elif self.is_flying and now - self._on_ground_since >= 2.0:
+                self.logger.warning("Drone reports it is on the ground - marking as landed")
+                self.is_flying = False
+                self.current_mode = FlightMode.LAND
+        else:
+            self._on_ground_since = None
+    
     def get_flight_status(self) -> Dict[str, Any]:
         """
         Get comprehensive flight status
@@ -407,6 +451,7 @@ class DroneController:
             "battery": self.current_battery,
             "altitude": self.current_altitude,
             "speed": self.current_speed,
+            "ground_speed": self.ground_speed,
             "emergency_stop": self.emergency_stop_active,
             "connected": self.connection.is_connected
         }

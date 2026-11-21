@@ -1,5 +1,5 @@
 """
-Video Streaming Module for P8 Pro Drone Camera
+Video Streaming Module for the drone camera
 Handles video stream reception, decoding, and display with HUD overlay
 """
 
@@ -14,7 +14,7 @@ from queue import Queue, Empty
 import struct
 
 class VideoStream:
-    """Manages video streaming from P8 Pro drone camera"""
+    """Manages video streaming from the drone camera"""
     
     def __init__(self, drone_ip: str = "192.168.1.1", video_port: int = 11111):
         """
@@ -110,7 +110,13 @@ class VideoStream:
                     data, _ = self.video_socket.recvfrom(2048)
                     
                     if data:
-                        buffer += data
+                        # A new JPEG always starts a fresh buffer. Without this,
+                        # joining the stream mid-frame (or losing one packet)
+                        # leaves junk at the front and no frame ever decodes.
+                        if data.startswith(b'\xff\xd8'):
+                            buffer = data
+                        else:
+                            buffer += data
                         
                         # Try to decode frame from buffer
                         frame = self._decode_frame(buffer)
@@ -352,7 +358,7 @@ class HUDOverlay:
         if 'temperature' in telemetry_data:
             temp = telemetry_data['temperature']
             temp_color = self.warning_color if temp > 70 else self.text_color
-            self._draw_text_with_bg(frame, f"TEMP: {temp}°C", (width - 150, y_offset), temp_color)
+            self._draw_text_with_bg(frame, f"TEMP: {temp}C", (width - 150, y_offset), temp_color)
         
         # Time of flight sensor (top right)
         if 'time_of_flight' in telemetry_data:
@@ -415,7 +421,7 @@ class HUDOverlay:
             if i == 0:  # Current heading
                 cv2.line(frame, (mark_x, compass_y - 10), (mark_x, compass_y + 10), 
                         self.text_color, 3)
-                self._draw_text_with_bg(frame, f"{int(heading)}°", 
+                self._draw_text_with_bg(frame, f"{int(heading) % 360:03d}", 
                                       (mark_x - 15, compass_y - 20))
             else:
                 cv2.line(frame, (mark_x, compass_y - 5), (mark_x, compass_y + 5), 

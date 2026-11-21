@@ -1,7 +1,7 @@
-# P8 Pro Drone Controller V4 - API Reference
+# KOMPAS ground control station - API Reference
 
 ## Overview
-This document provides technical reference for the P8 Pro Drone Controller V4 software architecture, classes, and methods.
+This document provides technical reference for the KOMPAS ground control station software architecture, classes, and methods.
 
 ## Architecture
 
@@ -29,7 +29,7 @@ This document provides technical reference for the P8 Pro Drone Controller V4 so
 ### DroneConnection
 **File:** `src/communication/wifi_connection.py`
 
-Manages WiFi communication with the P8 Pro drone.
+Manages WiFi communication with the drone.
 
 #### Constructor
 ```python
@@ -511,4 +511,4 @@ status = safety.get_safety_status()
 errors = config.validate_config()
 ```
 
-This API reference provides the foundation for extending and customizing the P8 Pro Drone Controller V4 software.
+This API reference provides the foundation for extending and customizing the KOMPAS ground control station software.

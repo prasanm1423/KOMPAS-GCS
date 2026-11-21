@@ -1,5 +1,5 @@
 """
-Video Display Window for P8 Pro Drone Controller
+Video Display Window for KOMPAS
 Handles video stream display with HUD overlay and recording capabilities
 """
 
@@ -70,7 +70,7 @@ class VideoWindow:
         
         # Create video window
         self.video_window = tk.Toplevel(self.parent)
-        self.video_window.title("P8 Pro - Camera Feed")
+        self.video_window.title("KOMPAS - Camera Feed")
         self.video_window.geometry(f"{self.display_width + 20}x{self.display_height + 100}")
         
         # Configure window
@@ -272,6 +272,10 @@ class VideoWindow:
                 
                 time.sleep(1/30)  # Target 30 FPS display
                 
+            except (RuntimeError, tk.TclError):
+                # The Tk main loop has ended (window or app closed): stop quietly.
+                self.display_active = False
+                break
             except Exception as e:
                 self.logger.error(f"Display loop error: {e}")
                 time.sleep(0.1)
@@ -285,20 +289,21 @@ class VideoWindow:
             # Resize frame for display
             display_frame = self._resize_frame_for_display(frame)
             
-            # Convert to PIL Image
+            # Convert to PIL Image. The Tk PhotoImage itself must be created on
+            # the main thread (Tk is not thread-safe), so hand over the PIL image.
             frame_rgb = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
             pil_image = Image.fromarray(frame_rgb)
-            photo = ImageTk.PhotoImage(pil_image)
+            self.video_window.after(0, self._update_display_image, pil_image)
             
-            # Update display in main thread
-            self.video_window.after(0, self._update_display_image, photo)
-            
+        except (RuntimeError, tk.TclError):
+            self.display_active = False   # main loop gone; _display_loop exits
         except Exception as e:
             self.logger.error(f"Display update error: {e}")
     
-    def _update_display_image(self, photo):
+    def _update_display_image(self, pil_image):
         """Update display image in main thread"""
         if self.video_label:
+            photo = ImageTk.PhotoImage(pil_image)
             self.video_label.config(image=photo, text="")
             self.video_label.image = photo  # Keep reference
     

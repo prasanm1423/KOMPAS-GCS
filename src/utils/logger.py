@@ -1,5 +1,5 @@
 """
-Logging configuration for P8 Pro Drone Controller
+Logging configuration for KOMPAS
 Sets up structured logging for the application
 """
 

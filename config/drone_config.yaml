@@ -1,0 +1,75 @@
+# KOMPAS configuration
+#
+# Every value below is optional: anything you delete falls back to the
+# built-in default in config/settings.py. The app refuses to start if a
+# value is invalid, and the error message names the offending key.
+
+network:
+  drone_ip: "192.168.1.1"      # Drone's IP on its WiFi network
+  command_port: 8889           # UDP port commands are sent to
+  state_port: 8890             # UDP port telemetry is received on
+  video_port: 11111            # UDP port video is received on
+  connection_timeout: 5.0      # Seconds without telemetry before "connection lost"
+
+flight:
+  max_altitude: 500            # cm
+  max_speed: 100               # 10-100
+  default_speed: 50            # 10-100, must not exceed max_speed
+  default_move_distance: 30    # cm per movement command
+
+safety:
+  min_battery_level: 20             # % needed to take off
+  emergency_landing_enabled: true
+  auto_land_low_battery: true
+  auto_land_battery_threshold: 10   # % that triggers auto-land (below min_battery_level)
+  max_flight_time: 1200             # seconds (20 minutes)
+  connection_timeout_action: "land" # "land" or "hover"
+
+video:
+  enable_video_stream: true
+  resolution_width: 960
+  resolution_height: 720
+  frame_rate: 30
+  video_codec: "mp4v"               # FourCC used for recordings
+  auto_start_stream: false
+  recording_directory: "recordings"
+
+hud:
+  enable_hud: true
+  show_crosshair: true
+  show_telemetry: true
+  show_artificial_horizon: true
+  show_compass: true
+  hud_color_r: 0
+  hud_color_g: 255
+  hud_color_b: 0
+  font_scale: 0.6
+  warning_color_r: 0
+  warning_color_g: 0
+  warning_color_b: 255
+
+logging:
+  level: "INFO"                     # DEBUG, INFO, WARNING, ERROR, CRITICAL
+
+advanced:
+  enable_debug_mode: false
+
+preflight:
+  # Takeoff is blocked while any check fails; warnings need confirming.
+  max_tilt_deg: 10              # ground steeper than this blocks takeoff
+  battery_warning_margin: 15    # warn when within this % of safety.min_battery_level
+  warn_temperature: 70          # C
+  max_temperature: 80           # C, blocks takeoff at or above
+  min_telemetry_rate_hz: 2
+
+simulator:
+  # Flight Simulator Mode: a simulated drone on this machine that speaks the
+  # same UDP protocol, so the whole ground station runs without hardware.
+  # Also enabled by `python main.py --sim` or KOMPAS_SIMULATOR=1.
+  enabled: false
+  telemetry_rate_hz: 10
+  video_enabled: true
+  video_fps: 15
+  start_battery: 100            # % - set low (e.g. 25) to rehearse low-battery handling
+  battery_drain_per_min: 7.0    # % per minute with motors running (~14 min flight)
+  command_watchdog_s: 15        # auto-land after this long with no command; 0 = off

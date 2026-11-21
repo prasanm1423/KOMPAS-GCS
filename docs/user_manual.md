@@ -1,4 +1,4 @@
-# P8 Pro Drone Controller V4 - User Manual
+# KOMPAS ground control station - User Manual
 
 ## Table of Contents
 1. [Getting Started](#getting-started)
@@ -23,7 +23,7 @@ Before each flight, verify:
 
 ### First Flight
 1. **Connect to Drone**
-   - Power on P8 Pro drone
+   - Power on the drone
    - Connect computer to drone's WiFi network
    - Launch software: `python main.py`
    - Click "Connect" button

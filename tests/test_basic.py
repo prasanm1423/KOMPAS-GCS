@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Basic test script for P8 Pro Drone Controller V4
+Basic test script for KOMPAS ground control station
 Tests core functionality without requiring actual drone connection
 """
 
@@ -113,7 +113,7 @@ class TestConfiguration(unittest.TestCase):
 
 def run_basic_tests():
     """Run basic functionality tests"""
-    print("P8 Pro Drone Controller V4 - Basic Tests")
+    print("KOMPAS ground control station - Basic Tests")
     print("=" * 50)
     
     # Test imports
@@ -163,7 +163,7 @@ def run_basic_tests():
     print("\n" + "=" * 50)
     print("✓ All basic tests passed!")
     print("\nNext steps:")
-    print("1. Connect your P8 Pro drone")
+    print("1. Connect your drone")
     print("2. Run: python main.py")
     print("3. Click 'Connect' in the application")
     

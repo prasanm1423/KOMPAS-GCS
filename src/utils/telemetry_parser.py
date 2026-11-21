@@ -1,113 +1,80 @@
 """
-Telemetry Parser for P8 Pro Drone
+Telemetry Parser for the drone
 Parses incoming telemetry data and extracts relevant information
 """
 
 import re
+import time
 import logging
 from typing import Dict, Any, Optional
 
 class TelemetryParser:
     """Parses drone telemetry data into structured format"""
     
+    # Accepts both the Tello-SDK state format
+    #   "pitch:0;roll:0;yaw:0;vgx:0;...;h:80;bat:87;baro:12.34;time:5;agx:1.00;..."
+    # and the space-separated form used in the docs/tests ("bat:85 h:120 temp:32").
+    # Every "key:number" token is read independently, so field order and
+    # separators don't matter, and "temph:" can never be mistaken for "h:".
+    _TOKEN = re.compile(r'([A-Za-z_]+):(-?\d+(?:\.\d+)?)')
+
+    # raw key -> (output key, type)
+    _FIELDS = {
+        'bat': ('battery', int),
+        'h': ('altitude', int),
+        'vgx': ('speed_x', int),
+        'vgy': ('speed_y', int),
+        'vgz': ('speed_z', int),
+        'pitch': ('pitch', int),
+        'roll': ('roll', int),
+        'yaw': ('yaw', int),
+        'agx': ('acceleration_x', float),
+        'agy': ('acceleration_y', float),
+        'agz': ('acceleration_z', float),
+        'baro': ('barometer', float),
+        'tof': ('time_of_flight', int),
+        'time': ('motor_time', int),
+        'temp': ('temperature', int),
+        'templ': ('temperature_low', int),
+        'temph': ('temperature', int),   # report the hotter sensor
+    }
+
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        
-        # Regex patterns for common telemetry data
-        self.patterns = {
-            'battery': re.compile(r'bat:(\d+)'),
-            'altitude': re.compile(r'h:(\d+)'),
-            'speed': re.compile(r'vg([xyz]):(-?\d+)'),
-            'temperature': re.compile(r'temp:(\d+)'),
-            'attitude': re.compile(r'pitch:(-?\d+);roll:(-?\d+);yaw:(-?\d+)'),
-            'acceleration': re.compile(r'ag([xyz]):(-?\d+\.\d+)'),
-            'barometer': re.compile(r'baro:(-?\d+\.\d+)'),
-            'time_of_flight': re.compile(r'tof:(\d+)'),
-            'motor_time': re.compile(r'time:(\d+)')
-        }
-    
+
     def parse(self, telemetry_string: str) -> Dict[str, Any]:
         """
         Parse telemetry string into structured data
-        
+
         Args:
             telemetry_string: Raw telemetry data from drone
-            
+
         Returns:
-            dict: Parsed telemetry data
+            dict: Parsed telemetry data (empty if nothing recognisable)
         """
-        parsed_data = {}
-        
+        parsed_data: Dict[str, Any] = {}
+
         try:
-            # Clean the telemetry string
-            telemetry_string = telemetry_string.strip()
-            
-            # Extract battery level
-            battery_match = self.patterns['battery'].search(telemetry_string)
-            if battery_match:
-                parsed_data['battery'] = int(battery_match.group(1))
-            
-            # Extract altitude
-            altitude_match = self.patterns['altitude'].search(telemetry_string)
-            if altitude_match:
-                parsed_data['altitude'] = int(altitude_match.group(1))
-            
-            # Extract speed components
-            speed_matches = self.patterns['speed'].findall(telemetry_string)
-            if speed_matches:
-                speeds = {}
-                for axis, speed in speed_matches:
-                    speeds[f'speed_{axis}'] = int(speed)
-                parsed_data.update(speeds)
-                
-                # Calculate total speed
-                if 'speed_x' in speeds and 'speed_y' in speeds:
-                    total_speed = (speeds['speed_x']**2 + speeds['speed_y']**2)**0.5
-                    parsed_data['speed_total'] = round(total_speed, 2)
-            
-            # Extract temperature
-            temp_match = self.patterns['temperature'].search(telemetry_string)
-            if temp_match:
-                parsed_data['temperature'] = int(temp_match.group(1))
-            
-            # Extract attitude (pitch, roll, yaw)
-            attitude_match = self.patterns['attitude'].search(telemetry_string)
-            if attitude_match:
-                parsed_data['pitch'] = int(attitude_match.group(1))
-                parsed_data['roll'] = int(attitude_match.group(2))
-                parsed_data['yaw'] = int(attitude_match.group(3))
-            
-            # Extract acceleration
-            accel_matches = self.patterns['acceleration'].findall(telemetry_string)
-            if accel_matches:
-                for axis, accel in accel_matches:
-                    parsed_data[f'acceleration_{axis}'] = float(accel)
-            
-            # Extract barometer reading
-            baro_match = self.patterns['barometer'].search(telemetry_string)
-            if baro_match:
-                parsed_data['barometer'] = float(baro_match.group(1))
-            
-            # Extract time of flight sensor
-            tof_match = self.patterns['time_of_flight'].search(telemetry_string)
-            if tof_match:
-                parsed_data['time_of_flight'] = int(tof_match.group(1))
-            
-            # Extract motor time
-            motor_time_match = self.patterns['motor_time'].search(telemetry_string)
-            if motor_time_match:
-                parsed_data['motor_time'] = int(motor_time_match.group(1))
-            
-            # Add timestamp
-            import time
-            parsed_data['timestamp'] = time.time()
-            
+            for key, value in self._TOKEN.findall(telemetry_string):
+                field = self._FIELDS.get(key.lower())
+                if field is None:
+                    continue
+                name, cast = field
+                parsed_data[name] = cast(float(value))
+
+            if 'speed_x' in parsed_data and 'speed_y' in parsed_data:
+                total_speed = (parsed_data['speed_x'] ** 2 + parsed_data['speed_y'] ** 2) ** 0.5
+                parsed_data['speed_total'] = round(total_speed, 2)
+
+            if parsed_data:
+                parsed_data['timestamp'] = time.time()
+
             return parsed_data
-            
+
         except Exception as e:
             self.logger.error(f"Error parsing telemetry: {e}")
             return {}
-    
+
     def format_for_display(self, parsed_data: Dict[str, Any]) -> str:
         """
         Format parsed data for human-readable display

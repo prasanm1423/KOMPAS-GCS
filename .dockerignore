@@ -1,0 +1,21 @@
+# Keep the build context small and deterministic
+.git
+.gitignore
+**/__pycache__
+**/*.pyc
+*.egg-info
+.venv
+venv
+.pytest_cache
+
+# Runtime output (lives in the /config volume inside the container)
+logs/
+recordings/
+*.mp4
+*.avi
+test_video_demo.mp4
+
+# Docker files themselves (startapp.sh is copied explicitly)
+Dockerfile
+docker-compose.yml
+.dockerignore

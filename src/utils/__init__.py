@@ -1,5 +1,5 @@
 """
-Utilities package for P8 Pro drone controller
+Utilities package for KOMPAS
 Contains logging, telemetry parsing, safety management, video recording, and other utility modules
 """
 

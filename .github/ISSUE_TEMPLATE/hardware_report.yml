@@ -1,0 +1,32 @@
+name: Hardware compatibility report
+description: Tell us whether KOMPAS works with your drone
+labels: [hardware]
+body:
+  - type: input
+    id: model
+    attributes:
+      label: Drone make and model
+    validations:
+      required: true
+  - type: dropdown
+    id: result
+    attributes:
+      label: Did it work?
+      options: [Fully, Partly, Not at all]
+    validations:
+      required: true
+  - type: checkboxes
+    id: features
+    attributes:
+      label: What worked?
+      options:
+        - label: Connect
+        - label: Telemetry
+        - label: Takeoff / land
+        - label: Movement commands
+        - label: Video
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes
+      description: Drone IP, config changes you needed, errors from logs/, anything else.

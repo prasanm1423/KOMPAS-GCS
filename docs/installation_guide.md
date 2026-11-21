@@ -1,15 +1,15 @@
-# P8 Pro Drone Controller V4 - Installation Guide
+# KOMPAS ground control station - Installation Guide
 
 ## System Requirements
 
 ### Hardware Requirements
 - Computer with WiFi capability
-- P8 Pro drone with WiFi connectivity
+- A WiFi RC drone that speaks a Tello-SDK-style UDP protocol (developed against the P8 Pro)
 - Minimum 4GB RAM recommended
 - 100MB free disk space
 
 ### Software Requirements
-- Python 3.8 or higher
+- Python 3.9 or higher
 - Windows 10/11, macOS 10.14+, or Ubuntu 18.04+
 - WiFi adapter with support for 2.4GHz networks
 
@@ -38,7 +38,7 @@ sudo apt install python3 python3-pip
 ```
 
 ### 2. Download the Software
-1. Download or clone the P8 Pro Drone Controller V4 files
+1. Download or clone the KOMPAS ground control station files
 2. Extract to a folder like `C:\DroneController` or `~/DroneController`
 
 ### 3. Install Dependencies
@@ -68,7 +68,7 @@ Run the software to test installation:
 python main.py
 ```
 
-## P8 Pro Drone Setup
+## Drone Setup
 
 ### 1. Drone Preparation
 1. Ensure drone battery is fully charged

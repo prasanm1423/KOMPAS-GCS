@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# KOMPAS runtime output
+logs/
+recordings/
+data/
+*.mp4
+*.avi
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,27 @@
+services:
+  kompas:
+    build: .
+    image: kompas:latest
+    container_name: kompas
+    # Host networking lets the container reach the drone on the host's WiFi
+    # (192.168.1.1) and receive its UDP telemetry/video replies directly.
+    # With host networking, ports 5800/5900 open on the host itself.
+    # Linux only — on Docker Desktop (Mac/Windows), remove this line and
+    # uncomment the "ports" block below instead.
+    network_mode: host
+    # ports:
+    #   - "5800:5800"        # web UI
+    #   - "5900:5900"        # VNC
+    #   - "8890:8890/udp"    # drone telemetry
+    #   - "11111:11111/udp"  # drone video
+    environment:
+      - USER_ID=1000
+      - GROUP_ID=1000
+      - DISPLAY_WIDTH=1440
+      - DISPLAY_HEIGHT=1000
+      # - VNC_PASSWORD=change-me   # strongly recommended off localhost
+      # Flight Simulator Mode: fly a simulated drone, no hardware needed.
+      # - KOMPAS_SIMULATOR=1
+    volumes:
+      - ./data:/config        # logs/ and recordings/ appear in ./data
+    restart: unless-stopped

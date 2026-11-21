@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Video System Test for P8 Pro Drone Controller V4
+Video System Test for KOMPAS ground control station
 Tests video streaming, HUD overlay, and recording functionality
 """
 
@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 def test_video_components():
     """Test video system components"""
-    print("P8 Pro Drone Controller V4 - Video System Test")
+    print("KOMPAS ground control station - Video System Test")
     print("=" * 55)
     
     # Test video imports
@@ -121,13 +121,13 @@ def test_video_components():
     print("\n" + "=" * 55)
     print("✓ All video system tests passed!")
     print("\nVideo System Features Available:")
-    print("• Real-time video streaming from P8 Pro camera")
+    print("• Real-time video streaming from the drone camera")
     print("• HUD overlay with flight telemetry")
     print("• Video recording with metadata")
     print("• Customizable HUD elements")
     print("• Video analysis and reporting")
     print("\nTo use video features:")
-    print("1. Connect to your P8 Pro drone")
+    print("1. Connect to your drone")
     print("2. Run: python main.py")
     print("3. Click 'Open Camera' to start video window")
     print("4. Use video controls to start stream and recording")

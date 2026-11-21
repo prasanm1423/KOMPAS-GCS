@@ -1,12 +1,12 @@
-# P8 Pro Drone Controller V4 - Video and HUD System Guide
+# KOMPAS ground control station - Video and HUD System Guide
 
 ## Overview
-The P8 Pro Drone Controller V4 now includes comprehensive video streaming capabilities with an advanced HUD (Heads-Up Display) system for real-time flight data overlay.
+The KOMPAS ground control station now includes comprehensive video streaming capabilities with an advanced HUD (Heads-Up Display) system for real-time flight data overlay.
 
 ## 🎥 Video Features
 
 ### Real-time Video Streaming
-- **UDP-based streaming** from P8 Pro camera
+- **UDP-based streaming** from the drone camera
 - **720p/960p resolution** support
 - **30 FPS target** frame rate
 - **Automatic frame decoding** (JPEG/H.264)
@@ -370,4 +370,4 @@ The HUD design follows modern aviation and mobile drone app conventions:
 4. **Back up important recordings** to prevent data loss
 5. **Use telemetry data** for performance analysis
 
-The video and HUD system transforms your P8 Pro into a professional-grade platform with comprehensive visual feedback and recording capabilities!
+The video and HUD system transforms your drone into a professional-grade platform with comprehensive visual feedback and recording capabilities!

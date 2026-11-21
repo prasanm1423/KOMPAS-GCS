@@ -1,5 +1,5 @@
 """
-Control package for P8 Pro drone
+Control package for the drone
 Contains flight control and command modules
 """
 

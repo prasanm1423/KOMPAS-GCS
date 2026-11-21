@@ -1,5 +1,5 @@
 """
-GUI package for P8 Pro drone controller
+GUI package for KOMPAS
 Contains main window, video display, and UI components
 """
 
