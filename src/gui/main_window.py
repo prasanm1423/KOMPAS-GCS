@@ -13,6 +13,7 @@ from typing import Optional, Dict, Any
 from communication.wifi_connection import DroneConnection
 from control.drone_controller import DroneController, FlightMode
 from utils.telemetry_parser import TelemetryParser
+from utils.telemetry_logger import TelemetryLogger
 from utils.safety_manager import SafetyManager, SafetyLevel
 from utils.preflight import PreflightChecker, CheckStatus
 from gui.video_window import VideoWindow
@@ -422,8 +423,10 @@ class DroneControllerGUI:
         self.connection = DroneConnection(drone_ip, command_port, state_port)
         self.connection.set_telemetry_callback(self.on_telemetry_received)
         self.connection.set_connection_callback(self.on_connection_changed)
-        
-        self.controller = DroneController(self.connection)
+
+        save_csv = bool(self.config.get('logging', {}).get('save_flight_csv', True))
+        self.telemetry_logger = TelemetryLogger() if save_csv else None
+        self.controller = DroneController(self.connection, telemetry_logger=self.telemetry_logger)
         # Limits come from the config, not the controller's built-in defaults.
         self.controller.min_battery = self.config.get('safety', {}).get('min_battery_level', 20)
         self.controller.max_altitude = self.config.get('flight', {}).get('max_altitude', 500)
