@@ -220,8 +220,7 @@ class TelemetryLogger:
             try:
                 row = self._parse_telemetry_to_row(parsed_data)
                 self._csv_writer.writerow(row)
-                # Flush periodically for durability, but not every write for performance
-                # Flush every ~10 writes or when file size crosses a threshold
+                self._file_handle.flush()
                 return True
 
             except Exception as e:

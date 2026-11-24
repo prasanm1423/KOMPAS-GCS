@@ -10,21 +10,11 @@ import tempfile
 import threading
 import time
 import unittest
+import unittest.mock as mock
 from pathlib import Path
-
-# Stub cv2 before any source module that transitively imports it is loaded;
-# src/utils/__init__.py re-exports VideoRecorder which pulls in OpenCV.
-# The telemetry logger itself has no cv2 dependency.
-class _FakeCV2:
-    def __getattr__(self, name):
-        return None
-    def __call__(self, *a, **kw):
-        return None
-sys.modules.setdefault('cv2', _FakeCV2())
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-
 from utils.telemetry_logger import TelemetryLogger
 
 
@@ -196,6 +186,20 @@ class TestTelemetryLogger(unittest.TestCase):
 
     # -- thread safety -----------------------------------------------------
 
+    def test_flush_called_after_each_write(self):
+        """flush() is called after each successful writerow()."""
+        import unittest.mock as mock
+        self.logger.start_logging()
+
+        # Patch flush BEFORE writing
+        with mock.patch.object(self.logger._file_handle, 'flush', wraps=self.logger._file_handle.flush) as mock_flush:
+            for i in range(5):
+                self.logger.log_telemetry({'battery': 80 + i * 2, 'altitude': 100 + i * 10, 'timestamp': time.time()})
+
+            self.assertEqual(mock_flush.call_count, 5)
+
+        self.logger.stop_logging()
+
     def test_concurrent_writes(self):
         """Multiple threads writing simultaneously should not raise."""
         self.logger.start_logging()
@@ -228,6 +232,303 @@ class TestTelemetryLogger(unittest.TestCase):
             next(reader)  # skip header
             rows = list(reader)
         self.assertEqual(len(rows), 200)  # 4 threads × 50 writes
+
+
+# -- GUI shutdown path integration tests ------------------------------------
+
+class TestGUIShutdownPaths(unittest.TestCase):
+    """Integration tests for main_window.py shutdown paths (logger stop + disconnect)."""
+
+    def setUp(self):
+        # Create a mock tkinter root to avoid blocking mainloop
+        import tkinter as tk
+        self.root = tk.Tk()
+        self.root.withdraw()  # Hide the window
+        self.root.protocol('WM_DELETE_WINDOW', lambda: None)  # Prevent destruction during test
+
+    def tearDown(self):
+        self.root.destroy()
+
+    def _create_mock_components(self):
+        """Create mock drone connection + telemetry logger for GUI component tests."""
+        import unittest.mock as mock
+
+        # Mock DroneConnection
+        mock_connection = mock.MagicMock()
+        mock_connection.disconnect = mock.MagicMock(return_value=True)
+
+        # TelemetryLogger instance (simulating save_csv=True)
+        from utils import telemetry_logger
+        logger = telemetry_logger.TelemetryLogger()
+        logger.start_logging()
+
+        return mock_connection, logger
+
+    def test_disconnect_stops_logging_but_not_safety(self):
+        """disconnect_drone() stops logger and disconnects, but preserves safety."""
+        from gui.main_window import DroneControllerGUI
+
+        mock_conn, logger = self._create_mock_components()
+
+        # We'll construct just enough to test the disconnect path
+        # Create a minimal config
+        config = {
+            'network': {'drone_ip': '192.168.1.1', 'command_port': 8889, 'state_port': 8890},
+            'logging': {'save_flight_csv': True},
+            'safety': {'min_battery_level': 20},
+            'flight': {'max_altitude': 500, 'max_speed': 100},
+            'simulator': {'enabled': False}
+        }
+
+        gui = DroneControllerGUI(config)
+        gui.connection = mock_conn
+        gui.telemetry_logger = logger
+        gui.safety = mock.MagicMock()  # Mock safety manager
+
+        # Verify initial state
+        self.assertFalse(mock_conn.disconnect.called, "disconnect should not be called yet")
+        self.assertTrue(logger.is_logging(), "Logger should be active")
+
+        # Call disconnect_drone() first time
+        gui.disconnect_drone()
+
+        # Verify logger stopped and connection disconnected
+        self.assertFalse(logger.is_logging(), "Logger should be stopped")
+        self.assertTrue(mock_conn.disconnect.called, "Connection should be disconnected")
+
+        # Safety should NOT have been stopped
+        gui.safety.stop_monitoring.assert_not_called()
+
+        # Call disconnect_drone() again — should be safe
+        gui.disconnect_drone()
+
+        # Verify no harm done (disconnect is idempotent)
+        self.assertFalse(logger.is_logging(), "Logger still stopped")
+        self.assertTrue(mock_conn.disconnect.called, "Connection still disconnected")
+        gui.safety.stop_monitoring.assert_not_called()
+
+    def test_app_shutdown_stops_logging_disconnects_and_stops_safety(self):
+        """_app_shutdown() stops logger, disconnects, and stops safety monitoring."""
+        from gui.main_window import DroneControllerGUI
+
+        mock_conn, logger = self._create_mock_components()
+
+        config = {
+            'network': {'drone_ip': '192.168.1.1', 'command_port': 8889, 'state_port': 8890},
+            'logging': {'save_flight_csv': True},
+            'safety': {'min_battery_level': 20},
+            'flight': {'max_altitude': 500, 'max_speed': 100},
+            'simulator': {'enabled': False}
+        }
+
+        gui = DroneControllerGUI(config)
+        gui.connection = mock_conn
+        gui.telemetry_logger = logger
+        gui.safety = mock.MagicMock()
+
+        # Verify initial state
+        self.assertFalse(mock_conn.disconnect.called, "disconnect should not be called yet")
+        self.assertTrue(logger.is_logging(), "Logger should be active")
+
+        # Call _app_shutdown() first time
+        gui._app_shutdown()
+
+        # Verify all three cleanup operations occurred
+        self.assertFalse(logger.is_logging(), "Logger should be stopped")
+        self.assertTrue(mock_conn.disconnect.called, "Connection should be disconnected")
+        gui.safety.stop_monitoring.assert_called_once()
+
+        # Call _app_shutdown() again — should be idempotent (noop)
+        gui._app_shutdown()
+
+        # Verify no harm done (double-call should be safe)
+        self.assertFalse(logger.is_logging(), "Logger still stopped")
+        self.assertTrue(mock_conn.disconnect.called, "Connection still disconnected")
+        # Safety stop_monitoring should NOT have been called twice
+        gui.safety.stop_monitoring.assert_called_once()
+
+    def test_app_shutdown_continues_if_logger_raises(self):
+        """If stop_logging raises, disconnect and stop_monitoring still execute."""
+        from gui.main_window import DroneControllerGUI
+
+        mock_conn = mock.MagicMock()
+        mock_conn.disconnect.return_value = True
+        mock_safety = mock.MagicMock()
+        failing_logger = mock.MagicMock()
+        failing_logger.is_logging.side_effect = AssertionError("should not be checked")
+        failing_logger.stop_logging.side_effect = RuntimeError("logger broken")
+
+        config = {
+            'network': {'drone_ip': '192.168.1.1', 'command_port': 8889, 'state_port': 8890},
+            'logging': {'save_flight_csv': True},
+            'safety': {'min_battery_level': 20},
+            'flight': {'max_altitude': 500, 'max_speed': 100},
+            'simulator': {'enabled': False}
+        }
+        gui = DroneControllerGUI(config)
+        gui.connection = mock_conn
+        gui.telemetry_logger = failing_logger
+        gui.safety = mock_safety
+        gui._app_shutdown()
+
+        mock_conn.disconnect.assert_called_once()
+        mock_safety.stop_monitoring.assert_called_once()
+
+    def test_app_shutdown_continues_if_disconnect_raises(self):
+        """If disconnect raises, stop_monitoring still executes."""
+        from gui.main_window import DroneControllerGUI
+        import tempfile as _tf
+
+        mock_conn = mock.MagicMock()
+        mock_conn.disconnect.side_effect = ConnectionError("link lost")
+        mock_safety = mock.MagicMock()
+        tmpdir = _tf.mkdtemp()
+        logger = TelemetryLogger(log_dir=tmpdir)
+        logger.start_logging()
+        logger.stop_logging()
+
+        config = {
+            'network': {'drone_ip': '192.168.1.1', 'command_port': 8889, 'state_port': 8890},
+            'logging': {'save_flight_csv': True},
+            'safety': {'min_battery_level': 20},
+            'flight': {'max_altitude': 500, 'max_speed': 100},
+            'simulator': {'enabled': False}
+        }
+        gui = DroneControllerGUI(config)
+        gui.connection = mock_conn
+        gui.telemetry_logger = logger
+        gui.safety = mock_safety
+        gui._app_shutdown()
+
+        mock_safety.stop_monitoring.assert_called_once()
+        import shutil; shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def test_app_shutdown_logger_failure_then_retry_succeeds(self):
+        """Logger shutdown failure on first call is retried and succeeds on second call."""
+        from gui.main_window import DroneControllerGUI
+        import tempfile as _tf
+
+        mock_conn = mock.MagicMock()
+        mock_conn.disconnect.return_value = True
+        mock_safety = mock.MagicMock()
+        tmpdir = _tf.mkdtemp()
+
+        # Create a logger that fails once, then succeeds
+        call_count = [0]
+        def failing_then_succeeding():
+            call_count[0] += 1
+            if call_count[0] == 1:
+                raise RuntimeError("first attempt fails")
+            # Second call succeeds - use real logger
+            return None
+
+        failing_logger = mock.MagicMock()
+        failing_logger.stop_logging.side_effect = failing_then_succeeding
+
+        config = {
+            'network': {'drone_ip': '192.168.1.1', 'command_port': 8889, 'state_port': 8890},
+            'logging': {'save_flight_csv': True},
+            'safety': {'min_battery_level': 20},
+            'flight': {'max_altitude': 500, 'max_speed': 100},
+            'simulator': {'enabled': False}
+        }
+        gui = DroneControllerGUI(config)
+        gui.connection = mock_conn
+        gui.telemetry_logger = failing_logger
+        gui.safety = mock_safety
+
+        # First call: logger fails, but connection and safety still run
+        gui._app_shutdown()
+        mock_conn.disconnect.assert_called_once()
+        mock_safety.stop_monitoring.assert_called_once()
+        self.assertFalse(gui._shutdown_logger_done)  # Logger not marked done
+        self.assertTrue(gui._shutdown_connection_done)
+        self.assertTrue(gui._shutdown_safety_done)
+
+        # Second call: logger should retry and succeed
+        gui._app_shutdown()
+        self.assertTrue(gui._shutdown_logger_done)  # Now marked done
+        self.assertTrue(gui._shutdown_complete)  # All done, overall complete
+        import shutil; shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def test_app_shutdown_successful_operations_not_repeated(self):
+        """Operations that succeed on first call are not repeated on subsequent calls."""
+        from gui.main_window import DroneControllerGUI
+        import tempfile as _tf
+
+        mock_conn = mock.MagicMock()
+        mock_conn.disconnect.return_value = True
+        mock_safety = mock.MagicMock()
+        tmpdir = _tf.mkdtemp()
+        logger = TelemetryLogger(log_dir=tmpdir)
+        logger.start_logging()
+        logger.stop_logging()
+
+        config = {
+            'network': {'drone_ip': '192.168.1.1', 'command_port': 8889, 'state_port': 8890},
+            'logging': {'save_flight_csv': True},
+            'safety': {'min_battery_level': 20},
+            'flight': {'max_altitude': 500, 'max_speed': 100},
+            'simulator': {'enabled': False}
+        }
+        gui = DroneControllerGUI(config)
+        gui.connection = mock_conn
+        gui.telemetry_logger = logger
+        gui.safety = mock_safety
+
+        # First call: all succeed
+        gui._app_shutdown()
+        first_conn_calls = mock_conn.disconnect.call_count
+        first_safety_calls = mock_safety.stop_monitoring.call_count
+        self.assertTrue(gui._shutdown_logger_done)
+        self.assertTrue(gui._shutdown_connection_done)
+        self.assertTrue(gui._shutdown_safety_done)
+        self.assertTrue(gui._shutdown_complete)
+
+        # Second call: nothing should be retried
+        gui._app_shutdown()
+        self.assertEqual(mock_conn.disconnect.call_count, first_conn_calls)
+        self.assertEqual(mock_safety.stop_monitoring.call_count, first_safety_calls)
+        import shutil; shutil.rmtree(tmpdir, ignore_errors=True)
+
+    def test_app_shutdown_multiple_calls_safe(self):
+        """Multiple shutdown calls from different paths (WM_DELETE_WINDOW + finally) remain safe."""
+        from gui.main_window import DroneControllerGUI
+        import tempfile as _tf
+
+        mock_conn = mock.MagicMock()
+        mock_conn.disconnect.return_value = True
+        mock_safety = mock.MagicMock()
+        tmpdir = _tf.mkdtemp()
+        logger = TelemetryLogger(log_dir=tmpdir)
+        logger.start_logging()
+        logger.stop_logging()
+
+        config = {
+            'network': {'drone_ip': '192.168.1.1', 'command_port': 8889, 'state_port': 8890},
+            'logging': {'save_flight_csv': True},
+            'safety': {'min_battery_level': 20},
+            'flight': {'max_altitude': 500, 'max_speed': 100},
+            'simulator': {'enabled': False}
+        }
+        gui = DroneControllerGUI(config)
+        gui.connection = mock_conn
+        gui.telemetry_logger = logger
+        gui.safety = mock_safety
+
+        # Simulate WM_DELETE_WINDOW path
+        gui._app_shutdown()
+        # Simulate run() finally block path
+        gui._app_shutdown()
+        # Third call for good measure
+        gui._app_shutdown()
+
+        # All operations run exactly once
+        mock_conn.disconnect.assert_called_once()
+        mock_safety.stop_monitoring.assert_called_once()
+        self.assertTrue(gui._shutdown_complete)
+        import shutil; shutil.rmtree(tmpdir, ignore_errors=True)
+        import shutil; shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 if __name__ == "__main__":
