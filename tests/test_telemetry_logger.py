@@ -13,9 +13,18 @@ import unittest
 import unittest.mock as mock
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from utils.telemetry_logger import TelemetryLogger
+
+
+# Skip GUI tests on headless Linux (no DISPLAY)
+needs_display = pytest.mark.skipif(
+    sys.platform.startswith("linux") and not os.environ.get("DISPLAY"),
+    reason="needs a display",
+)
 
 
 class TestTelemetryLogger(unittest.TestCase):
@@ -236,6 +245,7 @@ class TestTelemetryLogger(unittest.TestCase):
 
 # -- GUI shutdown path integration tests ------------------------------------
 
+@needs_display
 class TestGUIShutdownPaths(unittest.TestCase):
     """Integration tests for main_window.py shutdown paths (logger stop + disconnect)."""
 
@@ -264,6 +274,7 @@ class TestGUIShutdownPaths(unittest.TestCase):
 
         return mock_connection, logger
 
+    @needs_display
     def test_disconnect_stops_logging_but_not_safety(self):
         """disconnect_drone() stops logger and disconnects, but preserves safety."""
         from gui.main_window import DroneControllerGUI
@@ -307,6 +318,7 @@ class TestGUIShutdownPaths(unittest.TestCase):
         self.assertTrue(mock_conn.disconnect.called, "Connection still disconnected")
         gui.safety.stop_monitoring.assert_not_called()
 
+    @needs_display
     def test_app_shutdown_stops_logging_disconnects_and_stops_safety(self):
         """_app_shutdown() stops logger, disconnects, and stops safety monitoring."""
         from gui.main_window import DroneControllerGUI
@@ -347,6 +359,7 @@ class TestGUIShutdownPaths(unittest.TestCase):
         # Safety stop_monitoring should NOT have been called twice
         gui.safety.stop_monitoring.assert_called_once()
 
+    @needs_display
     def test_app_shutdown_continues_if_logger_raises(self):
         """If stop_logging raises, disconnect and stop_monitoring still execute."""
         from gui.main_window import DroneControllerGUI
@@ -374,6 +387,7 @@ class TestGUIShutdownPaths(unittest.TestCase):
         mock_conn.disconnect.assert_called_once()
         mock_safety.stop_monitoring.assert_called_once()
 
+    @needs_display
     def test_app_shutdown_continues_if_disconnect_raises(self):
         """If disconnect raises, stop_monitoring still executes."""
         from gui.main_window import DroneControllerGUI
@@ -403,6 +417,7 @@ class TestGUIShutdownPaths(unittest.TestCase):
         mock_safety.stop_monitoring.assert_called_once()
         import shutil; shutil.rmtree(tmpdir, ignore_errors=True)
 
+    @needs_display
     def test_app_shutdown_logger_failure_then_retry_succeeds(self):
         """Logger shutdown failure on first call is retried and succeeds on second call."""
         from gui.main_window import DroneControllerGUI
@@ -451,6 +466,7 @@ class TestGUIShutdownPaths(unittest.TestCase):
         self.assertTrue(gui._shutdown_complete)  # All done, overall complete
         import shutil; shutil.rmtree(tmpdir, ignore_errors=True)
 
+    @needs_display
     def test_app_shutdown_successful_operations_not_repeated(self):
         """Operations that succeed on first call are not repeated on subsequent calls."""
         from gui.main_window import DroneControllerGUI
@@ -491,6 +507,7 @@ class TestGUIShutdownPaths(unittest.TestCase):
         self.assertEqual(mock_safety.stop_monitoring.call_count, first_safety_calls)
         import shutil; shutil.rmtree(tmpdir, ignore_errors=True)
 
+    @needs_display
     def test_app_shutdown_multiple_calls_safe(self):
         """Multiple shutdown calls from different paths (WM_DELETE_WINDOW + finally) remain safe."""
         from gui.main_window import DroneControllerGUI
